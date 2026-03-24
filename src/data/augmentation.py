@@ -6,6 +6,7 @@ Outputs: augmented training set
 Dependencies: spacy, pandas, tqdm, nltk, matplotlib, numpy
 """
 
+import argparse
 import ast
 import os
 import random
@@ -418,4 +419,19 @@ def main(tokenizer: str, similarity: bool):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Augment dataset")
+    parser.add_argument(
+        "--tokenizer",
+        type=str,
+        default="BPE",
+        choices=["BPE", "WordPiece", "Canine"],
+        help="The name of the file to save into",
+    )
+    parser.add_argument(
+        "--similarity",
+        action="store_false",
+        help="Whether to calculate similarity score between original and augmented text (significantly slows down the process)",
+    )
+    args = parser.parse_args()
+
     main(tokenizer="BPE", similarity=False)
