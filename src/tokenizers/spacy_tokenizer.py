@@ -1,8 +1,8 @@
 """
-Script: bpe_tokenizer.py
-Purpose: Train a Byte-Pair Encoding (BPE) tokenizer on a text corpus, compute tokenization statistics, and save the tokenizer model, vocabulary and filtered dataset for downstream NLP tasks.
+Script: spacy_tokenizer.py
+Purpose: Train a Byte-Pair Encoding (Spacy) tokenizer on a text corpus, compute tokenization statistics, and save the tokenizer model, vocabulary and filtered dataset for downstream NLP tasks.
 Inputs: Cleaned text dataset (CSV format)
-Outputs: Trained BPE tokenizer model (*.model), vocabulary file (*.vocab), tokenization statistics saved as JSON, histogram, and filtered dataset (*.csv)
+Outputs: Trained Spacy tokenizer model (*.model), vocabulary file (*.vocab), tokenization statistics saved as JSON, histogram, and filtered dataset (*.csv)
 Dependencies: sentencepiece, pandas, tqdm, numpy, matplotlib
 """
 
@@ -23,9 +23,9 @@ from tqdm import tqdm
 # ------------------------------------------------------------
 
 
-class BPETokenizer:
+class SpacyTokenizer:
     """
-    Wrapper around SentencePiece BPE tokenizer.
+    Wrapper around SentencePiece Spacy tokenizer.
 
     Provides training, loading, encoding and decoding functionality.
     The tokenizer is uninitialized until `train()` or `load()` is called.
@@ -42,11 +42,11 @@ class BPETokenizer:
         self,
         train_corpus: str,
         output_dir: str,
-        model_prefix: str = "BPE_tokenizer",
+        model_prefix: str = "Spacy_tokenizer",
         vocab_size: int = 32000,
     ):
         """
-        Train a SentencePiece BPE tokenizer on the provided corpus.
+        Train a SentencePiece Spacy tokenizer on the provided corpus.
 
         Args:
             train_corpus (str): Full training corpus as a single string.
@@ -68,7 +68,7 @@ class BPETokenizer:
                 input=tmp.name,
                 model_prefix=prefix_path,
                 vocab_size=vocab_size,
-                model_type="bpe",
+                model_type="spacy",
                 character_coverage=1.0,
                 pad_id=0,
                 unk_id=1,
@@ -177,7 +177,7 @@ def encode_stats(
     text: str, sp: spm.SentencePieceProcessor, unk: int
 ) -> tuple[int, int]:
     """
-    Encode a string using a trained BPE tokenizer and compute encoding statistics.
+    Encode a string using a trained Spacy tokenizer and compute encoding statistics.
 
     Args:
         text (str): Input string to encode.
@@ -218,20 +218,22 @@ def main():
     )
 
     # ------------------------------------------------------------
-    # Setting up the BPE tokenizer
+    # Setting up the Spacy tokenizer
     # ------------------------------------------------------------
 
     # Save to text corpus file for tokenizers
-    model_prefix = "BPE_tokenizer"
+    model_prefix = "Spacy_tokenizer"
     vocab_size = 32000
-    tokenizer = BPETokenizer()
+    tokenizer = SpacyTokenizer()
     tokenizer.train(
         train_corpus,
-        output_dir=os.path.join(ROOT_DIR, "tokenizer", "BPE"),
+        output_dir=os.path.join(ROOT_DIR, "tokenizers", "Spacy"),
         model_prefix=model_prefix,
         vocab_size=vocab_size,
     )
-    tokenizer.load(os.path.join(ROOT_DIR, "tokenizer", "BPE", f"{model_prefix}.model"))
+    tokenizer.load(
+        os.path.join(ROOT_DIR, "tokenizers", "Spacy", f"{model_prefix}.model")
+    )
 
     unk = tokenizer.sp.unk_id
     # Create empty DataFrames with columns
@@ -270,7 +272,7 @@ def main():
     # make a histogram of tokenized lengths
     plt.hist(train_filtered["token_article_len"], bins=50)
     plt.title("Article Length Distribution")
-    plt.savefig(os.path.join(ROOT_DIR, "data", "stats", "BPE_article_length.png"))
+    plt.savefig(os.path.join(ROOT_DIR, "data", "stats", "Spacy_article_length.png"))
     plt.close()
 
     # calculate OOV per sample
@@ -309,9 +311,9 @@ def main():
     plt.legend()
     plt.xlabel("Compression Ratio")
     plt.ylabel("Density")
-    plt.title("BPE Compression Ratio Distribution")
+    plt.title("Spacy Compression Ratio Distribution")
     plt.savefig(
-        os.path.join(ROOT_DIR, "data", "stats", "BPE_compression_distribution.png")
+        os.path.join(ROOT_DIR, "data", "stats", "Spacy_compression_distribution.png")
     )
     plt.close()
 
@@ -320,31 +322,31 @@ def main():
     # ------------------------------------------------------------
 
     # build a json data structure
-    stats_path = os.path.join(ROOT_DIR, "data", "stats", "BPE_stats.json")
-    bpe_stats = {
+    stats_path = os.path.join(ROOT_DIR, "data", "stats", "Spacy_stats.json")
+    spacy_stats = {
         "meta": {
             "timestamp": datetime.now().isoformat(),
             "vocab_size": int(tokenizer.sp.GetPieceSize()),
             "unk_id": int(tokenizer.sp.unk_id()),
         }
     }
-    bpe_stats["length_filter"] = {
+    spacy_stats["length_filter"] = {
         "p90": int(max_len),
         "threshold": int(threshold),
         "kept_samples": int(len(train_filtered)),
         "total_samples": int(len(train_tokenized)),
     }
-    bpe_stats["token_length_stats"] = {
+    spacy_stats["token_length_stats"] = {
         "article": article_stats,
         "highlight": highlight_stats,
     }
-    bpe_stats["oov"] = {
+    spacy_stats["oov"] = {
         "articles_rate": float(oov_rate_articles),
         "summary_rate": float(oov_rate_summary),
         "total_article_unk": int(train_filtered["article_unk"].sum()),
         "total_summary_unk": int(train_filtered["summary_unk"].sum()),
     }
-    bpe_stats["compression"] = {
+    spacy_stats["compression"] = {
         "mean": comp_mean_val,
         "std": comp_std_val,
         "median": p50,
@@ -353,11 +355,11 @@ def main():
 
     # save the json data
     with open(stats_path, "w") as f:
-        json.dump(bpe_stats, f, indent=4)
+        json.dump(spacy_stats, f, indent=4)
 
     # save the tokenized data
     train_filtered[["cleaned_text", "highlights"]].to_csv(
-        os.path.join(ROOT_DIR, "data", "processed", "BPE_train.csv"), index=False
+        os.path.join(ROOT_DIR, "data", "processed", "Spacy_train.csv"), index=False
     )
 
 

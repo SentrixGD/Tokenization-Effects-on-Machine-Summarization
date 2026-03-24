@@ -1,5 +1,5 @@
 """
-Script: BPE_model.py
+Script: Spacy_model.py
 Purpose: Define a PyTorch model for training on the Text Summarization dataset.
 Inputs: Tokenized training data
 Outputs: Trained model
@@ -119,7 +119,7 @@ def save_checkpoint(
     epoch: int,
     step: int,
     checkpoint_dir: str,
-    filename: str = "latest_BPE.pt",
+    filename: str = "latest_Spacy.pt",
 ) -> None:
     """
     Save a checkpoint of the model and optimizer.
@@ -282,11 +282,11 @@ def main():
 
     # load tokenized train, validation, and test datasets
     train_data = pd.read_csv(
-        os.path.join(ROOT_DIR, "data", "tokenized", "tokenized_train_BPE.csv")
+        os.path.join(ROOT_DIR, "data", "tokenized", "tokenized_train_Spacy.csv")
     )
 
     # load the SentencePiece tokenizer model
-    model_path = os.path.join(ROOT_DIR, "data", "tokenized", "BPE_tokenizer.model")
+    model_path = os.path.join(ROOT_DIR, "data", "tokenized", "Spacy_tokenizer.model")
     CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     sp = spm.SentencePieceProcessor()
@@ -344,14 +344,14 @@ def main():
         lambda step: lr_lambda(step, approximate_steps, warmup_steps),
     )
     # check if checkpoint exists
-    if os.path.exists(os.path.join(CHECKPOINT_DIR, "latest_BPE.pt")):
+    if os.path.exists(os.path.join(CHECKPOINT_DIR, "latest_Spacy.pt")):
         model, optimizer, scheduler, scaler, start_epoch, global_step = load_checkpoint(
             model,
             optimizer,
             scheduler,
             scaler,
             CHECKPOINT_DIR,
-            "latest_BPE.pt",
+            "latest_Spacy.pt",
         )
         print(f"Resuming from epoch {start_epoch}, global_step {global_step}")
     else:
@@ -384,7 +384,7 @@ def main():
     loss_window = deque(maxlen=100)
 
     # create log file
-    log_path = os.path.join(ROOT_DIR, "runs", "BPE", "log.csv")
+    log_path = os.path.join(ROOT_DIR, "runs", "Spacy", "log.csv")
     file_exists = os.path.isfile(log_path)
     csv_file = open(log_path, "a", newline="")
     writer = csv.writer(csv_file)
@@ -571,7 +571,7 @@ def main():
                     epoch,
                     global_step,
                     CHECKPOINT_DIR,
-                    filename=f"latest_BPE.pt",
+                    filename=f"latest_Spacy.pt",
                 )
                 # if the remaining tokens reach zero, exit the training loop
                 if optimal_tokens <= 0:

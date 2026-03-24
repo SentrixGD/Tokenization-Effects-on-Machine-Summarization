@@ -56,7 +56,7 @@ def main(tokenizer_param: str, new_json: bool):
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
     train_data = pd.read_csv(
-        os.path.join(ROOT_DIR, "data", "processed", f"{tokenizer_param}_train.csv")
+        os.path.join(ROOT_DIR, "data", "processed", f"train_augmented.csv")
     )
     val_data = pd.read_csv(
         os.path.join(ROOT_DIR, "data", "processed", f"validation.csv")
@@ -70,7 +70,10 @@ def main(tokenizer_param: str, new_json: bool):
     tokenizer = TOKENIZER_REGISTRY[tokenizer_param]()
     tokenizer.load(
         os.path.join(
-            ROOT_DIR, "data", "tokenized", f"{tokenizer_param}_tokenizer.model"
+            ROOT_DIR,
+            "tokenizer",
+            f"{tokenizer_param}",
+            f"{tokenizer_param}_tokenizer.model",
         )
     )
 

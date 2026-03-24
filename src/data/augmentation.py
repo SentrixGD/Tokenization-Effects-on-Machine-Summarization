@@ -280,7 +280,7 @@ def augment_batch(
     return augmented_texts, stats_all
 
 
-def main(tokenizer: str, similarity: bool):
+def main(similarity: bool):
     # ------------------------------------------------------------
     # loading the data
     # ------------------------------------------------------------
@@ -413,7 +413,7 @@ def main(tokenizer: str, similarity: bool):
         index=False,
     )
     data.to_csv(
-        os.path.join(ROOT_DIR, "data", "processed", f"{tokenizer}_augmented.csv"),
+        os.path.join(ROOT_DIR, "data", "processed", f"train_augmented.csv"),
         index=False,
     )
 
@@ -421,17 +421,10 @@ def main(tokenizer: str, similarity: bool):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Augment dataset")
     parser.add_argument(
-        "--tokenizer",
-        type=str,
-        default="BPE",
-        choices=["BPE", "WordPiece", "Canine"],
-        help="The name of the file to save into",
-    )
-    parser.add_argument(
         "--similarity",
-        action="store_false",
-        help="Whether to calculate similarity score between original and augmented text (significantly slows down the process)",
+        action="store_true",
+        help="Calculate similarity score between original and augmented text (slows down the process)",
     )
     args = parser.parse_args()
 
-    main(tokenizer="BPE", similarity=False)
+    main(similarity=args.similarity)
