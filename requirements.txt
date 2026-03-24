@@ -1,0 +1,15 @@
+# Python version
+python==3.11
+
+# Core libraries used in preprocessing
+pandas==2.3.3
+numpy==1.23.5
+matplotlib==3.10.8
+tqdm==4.67.1
+sentencepiece==0.2.1
+regex==2025.11.3
+spacy==3.8.11
+nltk==3.9.2
+torch==2.7.1+cu118
+rouge-score==0.1.2
+bert-score==0.3.13
