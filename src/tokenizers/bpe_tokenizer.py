@@ -29,7 +29,7 @@ class BPETokenizer:
         self,
         train_corpus: str,
         output_dir: str,
-        model_prefix: str = "bpe_tokenizer",
+        model_prefix: str = "BPE_tokenizer",
         vocab_size: int = 32000,
     ):
         """

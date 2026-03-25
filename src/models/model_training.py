@@ -1,12 +1,14 @@
 """
-Script: Word_model.py
+Script: model_training.py
 Purpose: Define a PyTorch model for training on the Text Summarization dataset.
 Inputs: Tokenized training data
 Outputs: Trained model
 Dependencies: torch, sentencepiece, pandas, numpy, tqdm
 """
 
+import argparse
 import csv
+import json
 import math
 import os
 import random
@@ -17,11 +19,12 @@ import numpy as np
 import pandas as pd
 import sentencepiece as spm
 import torch
-from model import Model, init_weights
 from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+
+from src.models.model import Model, init_weights
 
 
 def str2list(s):
@@ -119,7 +122,7 @@ def save_checkpoint(
     epoch: int,
     step: int,
     checkpoint_dir: str,
-    filename: str = "latest_Word.pt",
+    filename: str,
 ) -> None:
     """
     Save a checkpoint of the model and optimizer.
@@ -243,7 +246,16 @@ def seed_worker(worker_id):
     torch.manual_seed(worker_seed)
 
 
-def main():
+def main(
+    tokenizer_name: str,
+    vocab_size: int,
+    batch_size: int,
+    embed_dim: int,
+    heads: int,
+    layers: int,
+    lr: float,
+    true_batch_size: int,
+):
     """
     Main function for training the Text Summarization model.
 
@@ -282,11 +294,32 @@ def main():
 
     # load tokenized train, validation, and test datasets
     train_data = pd.read_csv(
-        os.path.join(ROOT_DIR, "data", "tokenized", "tokenized_train_Word.csv")
+        os.path.join(
+            ROOT_DIR, "data", "tokenized", f"tokenized_train_{tokenizer_name}.csv"
+        )
     )
 
+    #
+    tokenizer_stats = json.load(
+        open(
+            os.path.join(
+                ROOT_DIR,
+                "data",
+                "stats",
+                f"{tokenizer_name}_stats.json",
+            )
+        )
+    )
+    max_seq_len = tokenizer_stats["token_length_stats"]["highlight"]["p99"]
+    input_len = tokenizer_stats["token_length_stats"]["article"]["max"] // 1.1
+    highlight_len = tokenizer_stats["token_length_stats"]["highlight"]["mean"]
+    article_len = tokenizer_stats["token_length_stats"]["article"]["mean"]
+    sample_size = tokenizer_stats["token_length_stats"]["article"]["count"]
+
     # load the SentencePiece tokenizer model
-    model_path = os.path.join(ROOT_DIR, "data", "tokenized", "Word_tokenizer.model")
+    model_path = os.path.join(
+        ROOT_DIR, "data", "tokenized", f"{tokenizer_name}_tokenizer.model"
+    )
     CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     sp = spm.SentencePieceProcessor()
@@ -304,12 +337,13 @@ def main():
 
     # set Hyperparameters
     warmup_steps = 4000
-    vocab_size = 32000
-    true_batch_size = 32
-    batch_size = 2
     accumulation = true_batch_size // batch_size
 
-    model = Model(vocab_size, 768, 12, 8, 0.1, 0.1, 0, 1182).float().cuda()
+    model = (
+        Model(vocab_size, embed_dim, layers, heads, 0.1, 0.1, 0, input_len)
+        .float()
+        .cuda()
+    )
 
     # initialize model weights
     init_weights(model)
@@ -329,10 +363,10 @@ def main():
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total parameters: {total_params:,}")
     print(f"Trainable parameters: {trainable_params:,}")
-    tokens_per_sample = 62.36000463660601 + 684.7930636374174
+    tokens_per_sample = highlight_len + article_len
 
     # create optimizer instance
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
 
     # set approximate steps
     approximate_steps = math.ceil(
@@ -344,14 +378,14 @@ def main():
         lambda step: lr_lambda(step, approximate_steps, warmup_steps),
     )
     # check if checkpoint exists
-    if os.path.exists(os.path.join(CHECKPOINT_DIR, "latest_Word.pt")):
+    if os.path.exists(os.path.join(CHECKPOINT_DIR, f"latest_{tokenizer_name}.pt")):
         model, optimizer, scheduler, scaler, start_epoch, global_step = load_checkpoint(
             model,
             optimizer,
             scheduler,
             scaler,
             CHECKPOINT_DIR,
-            "latest_Word.pt",
+            f"latest_{tokenizer_name}.pt",
         )
         print(f"Resuming from epoch {start_epoch}, global_step {global_step}")
     else:
@@ -365,7 +399,7 @@ def main():
     print(
         optimal_tokens,
         optimal_tokens / (tokens_per_sample * true_batch_size),
-        optimal_tokens / (tokens_per_sample * 215675 * 2),
+        optimal_tokens / (tokens_per_sample * sample_size),
     )
 
     # create DataLoaders for train and validation sets
@@ -384,7 +418,7 @@ def main():
     loss_window = deque(maxlen=100)
 
     # create log file
-    log_path = os.path.join(ROOT_DIR, "runs", "Word", "log.csv")
+    log_path = os.path.join(ROOT_DIR, "runs", f"{tokenizer_name}", "log.csv")
     file_exists = os.path.isfile(log_path)
     csv_file = open(log_path, "a", newline="")
     writer = csv.writer(csv_file)
@@ -492,7 +526,7 @@ def main():
                     outputs = []
 
                     # generate sequence using greedy decoding
-                    for t in range(117):
+                    for t in range(max_seq_len):
                         logits = model(
                             src_single, input_tok
                         )  # (1, seq_len, vocab_size)
@@ -515,7 +549,7 @@ def main():
                     # generate sequence using multinomial sampling
                     input_tok = torch.full((1, 1), 2, device=src_single.device)  # BOS
                     outputs = []
-                    for t in range(117):
+                    for t in range(max_seq_len):
                         logits = model(
                             src_single, input_tok
                         )  # (1, seq_len, vocab_size)
@@ -571,7 +605,7 @@ def main():
                     epoch,
                     global_step,
                     CHECKPOINT_DIR,
-                    filename=f"latest_Word.pt",
+                    filename=f"latest_{tokenizer_name}.pt",
                 )
                 # if the remaining tokens reach zero, exit the training loop
                 if optimal_tokens <= 0:
@@ -582,4 +616,65 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Tokenize dataset")
+    parser.add_argument(
+        "--tokenizer",
+        type=str,
+        default="BPE",
+        choices=["BPE", "Word", "Canine"],
+        help="Tokenizer regime to use (default: BPE)",
+    )
+    parser.add_argument(
+        "--vocab_size",
+        type=int,
+        default=32000,
+        help="Vocabulary size for tokenizer (default: 32000)",
+    )
+    parser.add_argument(
+        "--mini_batch",
+        type=int,
+        default=2,
+        help="Mini batch size, must be a divisor of the true batch size (default: 2)",
+    )
+    parser.add_argument(
+        "--embed_dim",
+        type=int,
+        default=768,
+        help="Embedding dimension and the hidden dimension in the network (default: 768)",
+    )
+    parser.add_argument(
+        "--heads",
+        type=int,
+        default=8,
+        help="Number of heads in attention layers (default: 8)",
+    )
+    parser.add_argument(
+        "--layers",
+        type=int,
+        default=12,
+        help="Number of layers in the network: encoders, decoders (overall number of layers = 2 * layers) (default: 12)",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-4,
+        help="Learning rate for the optimizer (default: 1e-4)",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=32,
+        help="Batch size (default: 32)",
+    )
+    args = parser.parse_args()
+
+    main(
+        tokenizer_name=args.tokenizer,
+        vocab_size=args.vocab_size,
+        batch_size=args.mini_batch,
+        embed_dim=args.embed_dim,
+        heads=args.heads,
+        layers=args.layers,
+        lr=args.lr,
+        true_batch_size=args.batch_size,
+    )
