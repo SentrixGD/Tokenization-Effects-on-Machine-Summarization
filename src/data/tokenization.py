@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--new_json",
         action="store_true",
-        help="Whether to create a new JSON for tokenized statistics (defaults to true)",
+        help="Whether to create a new JSON for tokenized statistics (defaults to false)",
     )
     args = parser.parse_args()
 

@@ -1,0 +1,53 @@
+{
+    "meta": {
+        "timestamp": "2026-03-25T17:10:09.538228",
+        "vocab_size": 32000,
+        "unk_id": 1
+    },
+    "length_filter": {
+        "p90": 1014,
+        "threshold": 1115,
+        "kept_samples": 430524,
+        "total_samples": 460456
+    },
+    "token_length_stats": {
+        "article": {
+            "name": "articles",
+            "count": 430524,
+            "mean": 579.1098312753761,
+            "std": 227.09866619289414,
+            "min": 39,
+            "p50": 561.0,
+            "p80": 786.0,
+            "p90": 904.0,
+            "p95": 988.0,
+            "p99": 1084.0,
+            "max": 1115
+        },
+        "highlight": {
+            "name": "highlights",
+            "count": 430524,
+            "mean": 54.13875881483959,
+            "std": 19.125210579718495,
+            "min": 7,
+            "p50": 51.0,
+            "p80": 66.0,
+            "p90": 78.0,
+            "p95": 90.0,
+            "p99": 117.0,
+            "max": 510
+        }
+    },
+    "oov": {
+        "articles_rate": 0.0,
+        "summary_rate": 0.0,
+        "total_article_unk": 0,
+        "total_summary_unk": 0
+    },
+    "compression": {
+        "mean": 1.030759253429275,
+        "std": 0.09912944306668645,
+        "median": 0.98,
+        "p90": 1.151685393258427
+    }
+}

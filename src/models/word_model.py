@@ -492,7 +492,7 @@ def main():
                     outputs = []
 
                     # generate sequence using greedy decoding
-                    for t in range(133):
+                    for t in range(117):
                         logits = model(
                             src_single, input_tok
                         )  # (1, seq_len, vocab_size)
@@ -515,7 +515,7 @@ def main():
                     # generate sequence using multinomial sampling
                     input_tok = torch.full((1, 1), 2, device=src_single.device)  # BOS
                     outputs = []
-                    for t in range(133):
+                    for t in range(117):
                         logits = model(
                             src_single, input_tok
                         )  # (1, seq_len, vocab_size)

@@ -1,8 +1,8 @@
 """
-Script: spacy_tokenizer.py
-Purpose: Train a Byte-Pair Encoding (Spacy) tokenizer on a text corpus, compute tokenization statistics, and save the tokenizer model, vocabulary and filtered dataset for downstream NLP tasks.
+Script: word_tokenizer.py
+Purpose: Train a Byte-Pair Encoding (Word) tokenizer on a text corpus, compute tokenization statistics, and save the tokenizer model, vocabulary and filtered dataset for downstream NLP tasks.
 Inputs: Cleaned text dataset (CSV format)
-Outputs: Trained Spacy tokenizer model (*.model), vocabulary file (*.vocab), tokenization statistics saved as JSON, histogram, and filtered dataset (*.csv)
+Outputs: Trained Word tokenizer model (*.model), vocabulary file (*.vocab), tokenization statistics saved as JSON, histogram, and filtered dataset (*.csv)
 Dependencies: sentencepiece, pandas, tqdm, numpy, matplotlib
 """
 
@@ -23,9 +23,9 @@ from tqdm import tqdm
 # ------------------------------------------------------------
 
 
-class SpacyTokenizer:
+class WordTokenizer:
     """
-    Wrapper around SentencePiece Spacy tokenizer.
+    Wrapper around SentencePiece Word tokenizer.
 
     Provides training, loading, encoding and decoding functionality.
     The tokenizer is uninitialized until `train()` or `load()` is called.
@@ -42,11 +42,11 @@ class SpacyTokenizer:
         self,
         train_corpus: str,
         output_dir: str,
-        model_prefix: str = "Spacy_tokenizer",
+        model_prefix: str = "Word_tokenizer",
         vocab_size: int = 32000,
     ):
         """
-        Train a SentencePiece Spacy tokenizer on the provided corpus.
+        Train a SentencePiece Word tokenizer on the provided corpus.
 
         Args:
             train_corpus (str): Full training corpus as a single string.
@@ -68,7 +68,7 @@ class SpacyTokenizer:
                 input=tmp.name,
                 model_prefix=prefix_path,
                 vocab_size=vocab_size,
-                model_type="spacy",
+                model_type="word",
                 character_coverage=1.0,
                 pad_id=0,
                 unk_id=1,
@@ -177,7 +177,7 @@ def encode_stats(
     text: str, sp: spm.SentencePieceProcessor, unk: int
 ) -> tuple[int, int]:
     """
-    Encode a string using a trained Spacy tokenizer and compute encoding statistics.
+    Encode a string using a trained Word tokenizer and compute encoding statistics.
 
     Args:
         text (str): Input string to encode.
@@ -191,6 +191,11 @@ def encode_stats(
     """
     ids = sp.Encode(text, out_type=int)
     return len(ids), ids.count(unk)
+
+
+def split_text(text: str) -> str:
+    tokens = re.findall(r"\d+|\w+|[^\w\s]", text, flags=re.UNICODE)
+    return " ".join(tokens)
 
 
 def main():
@@ -211,29 +216,33 @@ def main():
     train_processed = pd.read_csv(
         os.path.join(processed_file_dir, "train_augmented.csv")
     )
-    train_corpus = "\n".join(
-        (train_processed["cleaned_text"] + " " + train_processed["highlights"]).astype(
-            str
-        )
+
+    # split the text
+    combined = (
+        train_processed["cleaned_text"].astype(str)
+        + " "
+        + train_processed["highlights"].astype(str)
     )
 
+    processed = combined.progress_apply(split_text)
+
+    train_corpus = "\n".join(processed)
+
     # ------------------------------------------------------------
-    # Setting up the Spacy tokenizer
+    # Setting up the Word tokenizer
     # ------------------------------------------------------------
 
     # Save to text corpus file for tokenizers
-    model_prefix = "Spacy_tokenizer"
+    model_prefix = "Word_tokenizer"
     vocab_size = 32000
-    tokenizer = SpacyTokenizer()
+    tokenizer = WordTokenizer()
     tokenizer.train(
         train_corpus,
-        output_dir=os.path.join(ROOT_DIR, "tokenizers", "Spacy"),
+        output_dir=os.path.join(ROOT_DIR, "tokenizer", "Word"),
         model_prefix=model_prefix,
         vocab_size=vocab_size,
     )
-    tokenizer.load(
-        os.path.join(ROOT_DIR, "tokenizers", "Spacy", f"{model_prefix}.model")
-    )
+    tokenizer.load(os.path.join(ROOT_DIR, "tokenizer", "Word", f"{model_prefix}.model"))
 
     unk = tokenizer.sp.unk_id
     # Create empty DataFrames with columns
@@ -272,7 +281,7 @@ def main():
     # make a histogram of tokenized lengths
     plt.hist(train_filtered["token_article_len"], bins=50)
     plt.title("Article Length Distribution")
-    plt.savefig(os.path.join(ROOT_DIR, "data", "stats", "Spacy_article_length.png"))
+    plt.savefig(os.path.join(ROOT_DIR, "data", "stats", "Word_article_length.png"))
     plt.close()
 
     # calculate OOV per sample
@@ -311,9 +320,9 @@ def main():
     plt.legend()
     plt.xlabel("Compression Ratio")
     plt.ylabel("Density")
-    plt.title("Spacy Compression Ratio Distribution")
+    plt.title("Word Compression Ratio Distribution")
     plt.savefig(
-        os.path.join(ROOT_DIR, "data", "stats", "Spacy_compression_distribution.png")
+        os.path.join(ROOT_DIR, "data", "stats", "Word_compression_distribution.png")
     )
     plt.close()
 
@@ -322,31 +331,31 @@ def main():
     # ------------------------------------------------------------
 
     # build a json data structure
-    stats_path = os.path.join(ROOT_DIR, "data", "stats", "Spacy_stats.json")
-    spacy_stats = {
+    stats_path = os.path.join(ROOT_DIR, "data", "stats", "Word_stats.json")
+    word_level_stats = {
         "meta": {
             "timestamp": datetime.now().isoformat(),
             "vocab_size": int(tokenizer.sp.GetPieceSize()),
             "unk_id": int(tokenizer.sp.unk_id()),
         }
     }
-    spacy_stats["length_filter"] = {
+    word_level_stats["length_filter"] = {
         "p90": int(max_len),
         "threshold": int(threshold),
         "kept_samples": int(len(train_filtered)),
         "total_samples": int(len(train_tokenized)),
     }
-    spacy_stats["token_length_stats"] = {
+    word_level_stats["token_length_stats"] = {
         "article": article_stats,
         "highlight": highlight_stats,
     }
-    spacy_stats["oov"] = {
+    word_level_stats["oov"] = {
         "articles_rate": float(oov_rate_articles),
         "summary_rate": float(oov_rate_summary),
         "total_article_unk": int(train_filtered["article_unk"].sum()),
         "total_summary_unk": int(train_filtered["summary_unk"].sum()),
     }
-    spacy_stats["compression"] = {
+    word_level_stats["compression"] = {
         "mean": comp_mean_val,
         "std": comp_std_val,
         "median": p50,
@@ -355,11 +364,11 @@ def main():
 
     # save the json data
     with open(stats_path, "w") as f:
-        json.dump(spacy_stats, f, indent=4)
+        json.dump(word_level_stats, f, indent=4)
 
     # save the tokenized data
     train_filtered[["cleaned_text", "highlights"]].to_csv(
-        os.path.join(ROOT_DIR, "data", "processed", "Spacy_train.csv"), index=False
+        os.path.join(ROOT_DIR, "data", "processed", "Word_train.csv"), index=False
     )
 
 
