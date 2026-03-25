@@ -1,31 +1,18 @@
 """
 Script: bpe_tokenizer.py
-Purpose: Train a Byte-Pair Encoding (BPE) tokenizer on a text corpus, compute tokenization statistics, and save the tokenizer model, vocabulary and filtered dataset for downstream NLP tasks.
-Inputs: Cleaned text dataset (CSV format)
-Outputs: Trained BPE tokenizer model (*.model), vocabulary file (*.vocab), tokenization statistics saved as JSON, histogram, and filtered dataset (*.csv)
-Dependencies: sentencepiece, pandas, tqdm, numpy, matplotlib
+Purpose: Class of the bpe tokenizer
+Dependencies: sentencepiece
 """
 
-import json
 import os
-import re
 import tempfile
-from datetime import datetime
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import sentencepiece as spm
-from tqdm import tqdm
-
-# ------------------------------------------------------------
-# Classes
-# ------------------------------------------------------------
 
 
 class BPETokenizer:
     """
-    Wrapper around SentencePiece BPE tokenizer.
+    Wrapper around SentencePiece bpe tokenizer.
 
     Provides training, loading, encoding and decoding functionality.
     The tokenizer is uninitialized until `train()` or `load()` is called.
@@ -42,11 +29,11 @@ class BPETokenizer:
         self,
         train_corpus: str,
         output_dir: str,
-        model_prefix: str = "BPE_tokenizer",
+        model_prefix: str = "bpe_tokenizer",
         vocab_size: int = 32000,
     ):
         """
-        Train a SentencePiece BPE tokenizer on the provided corpus.
+        Train a SentencePiece bpe tokenizer on the provided corpus.
 
         Args:
             train_corpus (str): Full training corpus as a single string.
@@ -125,241 +112,3 @@ class BPETokenizer:
             int: Unknown token ID.
         """
         return self.sp.unk_id()
-
-
-# ------------------------------------------------------------
-# Functions
-# ------------------------------------------------------------
-
-
-def length_stats(series: pd.Series, name: str) -> dict:
-    """
-    Compute descriptive statistics for a numeric series (e.g., lengths of sequences).
-
-    Args:
-        series (pd.Series): Series of numeric values to compute statistics on.
-        name (str): Label or name to associate with this series.
-
-    Returns:
-        dict: Dictionary containing:
-            - 'name' (str): The provided name.
-            - 'count' (int): Number of elements in the series.
-            - 'mean' (float): Mean value.
-            - 'std' (float): Standard deviation.
-            - 'min' (int): Minimum value.
-            - 'p50' (float): 50th percentile (median).
-            - 'p80' (float): 80th percentile.
-            - 'p90' (float): 90th percentile.
-            - 'p95' (float): 95th percentile.
-            - 'p99' (float): 99th percentile.
-            - 'max' (int): Maximum value.
-    """
-    arr = series.to_numpy()
-
-    stats = {
-        "name": name,
-        "count": len(arr),
-        "mean": float(np.mean(arr)),
-        "std": float(np.std(arr)),
-        "min": int(np.min(arr)),
-        "p50": float(np.percentile(arr, 50)),
-        "p80": float(np.percentile(arr, 80)),
-        "p90": float(np.percentile(arr, 90)),
-        "p95": float(np.percentile(arr, 95)),
-        "p99": float(np.percentile(arr, 99)),
-        "max": int(np.max(arr)),
-    }
-
-    return stats
-
-
-def encode_stats(
-    text: str, sp: spm.SentencePieceProcessor, unk: int
-) -> tuple[int, int]:
-    """
-    Encode a string using a trained BPE tokenizer and compute encoding statistics.
-
-    Args:
-        text (str): Input string to encode.
-        sp (spm.SentencePieceProcessor): Loaded SentencePiece tokenizer.
-        unk (int): ID of the unknown token.
-
-    Returns:
-        tuple[int, int]:
-            - encoded_length (int): Number of token IDs generated.
-            - unk_count (int): Number of unknown tokens (matching global `unk` ID).
-    """
-    ids = sp.Encode(text, out_type=int)
-    return len(ids), ids.count(unk)
-
-
-def main():
-    # ------------------------------------------------------------
-    # Loading the data
-    # ------------------------------------------------------------
-
-    # set up tqdm
-    tqdm.pandas(ncols=100, dynamic_ncols=True)
-
-    # set the root directory
-    ROOT_DIR: str = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-    processed_file_dir = os.path.join(ROOT_DIR, "data", "processed")
-
-    # load the preprocessed data
-    train_processed = pd.read_csv(
-        os.path.join(processed_file_dir, "train_augmented.csv")
-    )
-    train_corpus = "\n".join(
-        (train_processed["cleaned_text"] + " " + train_processed["highlights"]).astype(
-            str
-        )
-    )
-
-    # ------------------------------------------------------------
-    # Setting up the BPE tokenizer
-    # ------------------------------------------------------------
-
-    # Save to text corpus file for tokenizers
-    model_prefix = "BPE_tokenizer"
-    vocab_size = 32000
-    tokenizer = BPETokenizer()
-    tokenizer.train(
-        train_corpus,
-        output_dir=os.path.join(ROOT_DIR, "tokenizer", "BPE"),
-        model_prefix=model_prefix,
-        vocab_size=vocab_size,
-    )
-    tokenizer.load(os.path.join(ROOT_DIR, "tokenizer", "BPE", f"{model_prefix}.model"))
-
-    unk = tokenizer.sp.unk_id
-    # Create empty DataFrames with columns
-    train_tokenized = pd.DataFrame()
-
-    # ------------------------------------------------------------
-    # Tokenizing and analyzing the tokenized data
-    # ------------------------------------------------------------
-
-    # Tokenize the articles
-    train_tokenized[["token_article_len", "article_unk"]] = train_processed[
-        "cleaned_text"
-    ].progress_apply(lambda x: pd.Series(encode_stats(x, sp=tokenizer.sp, unk=unk)))
-    # transfer the pre-tokenized text
-    train_tokenized["cleaned_text"] = train_processed["cleaned_text"]
-    train_tokenized["highlights"] = train_processed["highlights"]
-    # Compute 90th percentile
-    max_len = int(np.percentile(train_tokenized["token_article_len"], 90))
-
-    # Optional: add 10% buffer
-    threshold = int(max_len * 1.1)
-
-    # Create mask (boolean Series) for articles <= max_len
-    mask_train = train_tokenized["token_article_len"] <= threshold
-    train_filtered = train_tokenized[mask_train].copy()
-
-    # tokenize the highlights
-    train_filtered[["token_highlight_len", "summary_unk"]] = train_processed[
-        "highlights"
-    ].progress_apply(lambda x: pd.Series(encode_stats(x, sp=tokenizer.sp, unk=unk)))
-
-    # calculate stats of tokenized data
-    article_stats = length_stats(train_filtered["token_article_len"], "articles")
-    highlight_stats = length_stats(train_filtered["token_highlight_len"], "highlights")
-
-    # make a histogram of tokenized lengths
-    plt.hist(train_filtered["token_article_len"], bins=50)
-    plt.title("Article Length Distribution")
-    plt.savefig(os.path.join(ROOT_DIR, "data", "stats", "BPE_article_length.png"))
-    plt.close()
-
-    # calculate OOV per sample
-    oov_rate_articles: int = (
-        train_filtered["article_unk"].sum() / train_filtered["token_article_len"].sum()
-    )
-    oov_rate_summary: int = (
-        train_filtered["summary_unk"].sum()
-        / train_filtered["token_highlight_len"].sum()
-    )
-
-    # calculate proper length of pre-tokenized sequences and calculate compression ratio
-    WORD_RE = re.compile(r"\w+")
-    train_filtered["cleaned_len"] = train_filtered["cleaned_text"].progress_apply(
-        lambda x: len(WORD_RE.findall(x))
-    )
-    train_filtered["compression"] = (
-        train_filtered["token_article_len"] / train_filtered["cleaned_len"]
-    )
-
-    # calculate compression data
-    comp: pd.Series[float] = train_filtered["compression"]
-    comp_mean_val = float(comp.mean())
-    comp_std_val = float(comp.std())
-    p50 = comp.quantile(0.5)
-    p90 = comp.quantile(0.9)
-
-    # make a compression distribution histogram
-    plt.figure(figsize=(10, 6))
-    plt.hist(comp, bins=100, alpha=0.75)
-    plt.axvline(
-        comp_mean_val, linestyle="--", label=f"mean={comp_mean_val:.3f}", color="green"
-    )
-    plt.axvline(p50, linestyle=":", label=f"median={p50:.3f}", color="orange")
-    plt.axvline(p90, linestyle="-.", label=f"p90={p90:.3f}", color="red")
-    plt.legend()
-    plt.xlabel("Compression Ratio")
-    plt.ylabel("Density")
-    plt.title("BPE Compression Ratio Distribution")
-    plt.savefig(
-        os.path.join(ROOT_DIR, "data", "stats", "BPE_compression_distribution.png")
-    )
-    plt.close()
-
-    # ------------------------------------------------------------
-    # Saving the results and filtered dataset
-    # ------------------------------------------------------------
-
-    # build a json data structure
-    stats_path = os.path.join(ROOT_DIR, "data", "stats", "BPE_stats.json")
-    bpe_stats = {
-        "meta": {
-            "timestamp": datetime.now().isoformat(),
-            "vocab_size": int(tokenizer.sp.GetPieceSize()),
-            "unk_id": int(tokenizer.sp.unk_id()),
-        }
-    }
-    bpe_stats["length_filter"] = {
-        "p90": int(max_len),
-        "threshold": int(threshold),
-        "kept_samples": int(len(train_filtered)),
-        "total_samples": int(len(train_tokenized)),
-    }
-    bpe_stats["token_length_stats"] = {
-        "article": article_stats,
-        "highlight": highlight_stats,
-    }
-    bpe_stats["oov"] = {
-        "articles_rate": float(oov_rate_articles),
-        "summary_rate": float(oov_rate_summary),
-        "total_article_unk": int(train_filtered["article_unk"].sum()),
-        "total_summary_unk": int(train_filtered["summary_unk"].sum()),
-    }
-    bpe_stats["compression"] = {
-        "mean": comp_mean_val,
-        "std": comp_std_val,
-        "median": p50,
-        "p90": p90,
-    }
-
-    # save the json data
-    with open(stats_path, "w") as f:
-        json.dump(bpe_stats, f, indent=4)
-
-    # save the tokenized data
-    train_filtered[["cleaned_text", "highlights"]].to_csv(
-        os.path.join(ROOT_DIR, "data", "processed", "BPE_train.csv"), index=False
-    )
-
-
-if __name__ == "__main__":
-    main()

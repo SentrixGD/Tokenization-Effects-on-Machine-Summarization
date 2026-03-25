@@ -137,7 +137,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "WordPiece", "Canine"],
+        choices=["BPE", "Word", "Canine"],
         help="Tokenizer regime to use",
     )
     parser.add_argument(
