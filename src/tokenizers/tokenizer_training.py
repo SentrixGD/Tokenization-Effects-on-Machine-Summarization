@@ -19,6 +19,8 @@ import sentencepiece as spm
 from tqdm import tqdm
 
 from src.tokenizers.bpe_tokenizer import BPETokenizer
+from src.tokenizers.char_tokenizer import CharTokenizer
+from src.tokenizers.unigram_tokenizer import UnigramTokenizer
 from src.tokenizers.word_tokenizer import WordTokenizer
 
 # ------------------------------------------------------------
@@ -130,6 +132,8 @@ def main(tokenizer_name: str, vocab_size: int):
     TOKENIZER_REGISTRY = {
         "BPE": BPETokenizer,
         "Word": WordTokenizer,
+        "Char": CharTokenizer,
+        "Unigram": UnigramTokenizer,
     }
     tokenizer = TOKENIZER_REGISTRY[tokenizer_name]()
 
@@ -286,7 +290,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "Word", "Canine"],
+        choices=["BPE", "Word", "Char", "Unigram"],
         help="Tokenizer regime to use (default: BPE)",
     )
     parser.add_argument(

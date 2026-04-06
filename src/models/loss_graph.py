@@ -43,7 +43,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "WordPiece", "Canine"],
+        choices=["BPE", "Word", "Char", "Unigram", "Charformer"],
         help="Tokenizer regime",
     )
 

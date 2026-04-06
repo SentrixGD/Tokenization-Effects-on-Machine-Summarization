@@ -310,15 +310,15 @@ def main(
             )
         )
     )
-    max_seq_len = tokenizer_stats["token_length_stats"]["highlight"]["p99"]
-    input_len = tokenizer_stats["token_length_stats"]["article"]["max"] // 1.1
-    highlight_len = tokenizer_stats["token_length_stats"]["highlight"]["mean"]
-    article_len = tokenizer_stats["token_length_stats"]["article"]["mean"]
-    sample_size = tokenizer_stats["token_length_stats"]["article"]["count"]
+    max_seq_len = int(tokenizer_stats["token_length_stats"]["highlight"]["p99"])
+    input_len = int(tokenizer_stats["token_length_stats"]["article"]["max"] / 1.1)
+    highlight_len = int(tokenizer_stats["token_length_stats"]["highlight"]["mean"])
+    article_len = int(tokenizer_stats["token_length_stats"]["article"]["mean"])
+    sample_size = int(tokenizer_stats["token_length_stats"]["article"]["count"])
 
     # load the SentencePiece tokenizer model
     model_path = os.path.join(
-        ROOT_DIR, "data", "tokenized", f"{tokenizer_name}_tokenizer.model"
+        ROOT_DIR, "tokenizer", f"{tokenizer_name}", f"{tokenizer_name}_tokenizer.model"
     )
     CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -407,7 +407,7 @@ def main(
         train_dataset,
         batch_size=true_batch_size,
         shuffle=True,
-        collate_fn=lambda x: collate_fn(x, max_src_len=1182),
+        collate_fn=lambda x: collate_fn(x, max_src_len=input_len),
         worker_init_fn=seed_worker,
         generator=g,
         num_workers=4,
@@ -418,12 +418,16 @@ def main(
     loss_window = deque(maxlen=100)
 
     # create log file
-    log_path = os.path.join(ROOT_DIR, "runs", f"{tokenizer_name}", "log.csv")
+    log_path = os.path.join(ROOT_DIR, "runs", tokenizer_name, "log.csv")
     file_exists = os.path.isfile(log_path)
-    csv_file = open(log_path, "a", newline="")
-    writer = csv.writer(csv_file)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     if not file_exists:
+        csv_file = open(log_path, "w", newline="")
+        writer = csv.writer(csv_file)
         writer.writerow(["step", "loss", "lr", "vram_gb"])
+    else:
+        csv_file = open(log_path, "a", newline="")
+        writer = csv.writer(csv_file)
 
     epoch = math.ceil(global_step / len(train_loader)) + 1
     # loop through the epochs
@@ -621,7 +625,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "Word", "Canine"],
+        choices=["BPE", "Word", "Char", "Charformer", "Unigram"],
         help="Tokenizer regime to use (default: BPE)",
     )
     parser.add_argument(

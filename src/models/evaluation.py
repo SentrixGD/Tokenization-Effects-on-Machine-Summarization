@@ -16,6 +16,9 @@ from tqdm import tqdm
 
 from src.models.model import Model
 from src.tokenizers.bpe_tokenizer import BPETokenizer
+from src.tokenizers.char_tokenizer import CharTokenizer
+from src.tokenizers.unigram_tokenizer import UnigramTokenizer
+from src.tokenizers.word_tokenizer import WordTokenizer
 
 
 # --- Loading a checkpoint ---
@@ -164,7 +167,9 @@ def collate_fn(batch):
     return src_batch, tgt_batch
 
 
-def main(tokenizer_type: str, vocab_size: int, max_len: int, min_len: int):
+def main(
+    tokenizer_type: str, vocab_size: int, max_len: int, min_len: int, seq_len: int
+):
     tqdm.pandas(ncols=100, dynamic_ncols=True)
     torch.backends.cudnn.benchmark = True
     ROOT_DIR: str = os.path.dirname(
@@ -173,6 +178,9 @@ def main(tokenizer_type: str, vocab_size: int, max_len: int, min_len: int):
     CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
     TOKENIZER_REGISTRY = {
         "BPE": BPETokenizer,
+        "Word": WordTokenizer,
+        "Char": CharTokenizer,
+        "Unigram": UnigramTokenizer,
     }
     tokenizer = TOKENIZER_REGISTRY[tokenizer_type]()
     tokenizer_model_path = os.path.join(
@@ -180,7 +188,7 @@ def main(tokenizer_type: str, vocab_size: int, max_len: int, min_len: int):
     )
     tokenizer.load(tokenizer_model_path)
     model = load_checkpoint(
-        Model(vocab_size, 768, 12, 8, 0.1, 0.1, 0, 1182).cuda(),
+        Model(vocab_size, 768, 12, 8, 0.1, 0.1, 0, seq_len).cuda(),
         CHECKPOINT_DIR,
         f"latest_{tokenizer_type}.pt",
     )
@@ -189,7 +197,7 @@ def main(tokenizer_type: str, vocab_size: int, max_len: int, min_len: int):
             ROOT_DIR, "data", "tokenized", f"tokenized_test_{tokenizer_type}.csv"
         )
     )
-    dataset = dataset_from_df(test_data)
+    dataset = dataset_from_df(test_data)[:1024]
 
     loader = DataLoader(
         dataset,
@@ -257,7 +265,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "WordPiece", "Canine"],
+        choices=["BPE", "Word", "Char", "Unigram"],
         help="Tokenizer regime",
     )
 
@@ -275,7 +283,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--min_len", type=int, default=20, help="Minimum output sequence length"
     )
-
+    parser.add_argument(
+        "--seq_len", type=int, default=20, help="Minimum output sequence length"
+    )
     args = parser.parse_args()
 
     main(
@@ -283,4 +293,5 @@ if __name__ == "__main__":
         vocab_size=args.vocab_size,
         max_len=args.max_len,
         min_len=args.min_len,
+        seq_len=args.seq_len,
     )

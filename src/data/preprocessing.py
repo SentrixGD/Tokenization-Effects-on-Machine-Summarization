@@ -390,6 +390,9 @@ def main():
     train["cleaned_text"] = train["article"].progress_apply(
         lambda x: cleaning(x, tracker, ALLOWED_CHARS)
     )
+    train["highlights"] = train["highlights"].progress_apply(
+        lambda x: cleaning(x, tracker, ALLOWED_CHARS)
+    )
 
     # ------------------------------------------------------------
     # Data cleaning

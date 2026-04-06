@@ -14,6 +14,9 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.tokenizers.bpe_tokenizer import BPETokenizer
+from src.tokenizers.char_tokenizer import CharTokenizer
+from src.tokenizers.unigram_tokenizer import UnigramTokenizer
+from src.tokenizers.word_tokenizer import WordTokenizer
 
 
 def save_token_count_json(token_count: int, filepath: str, overwrite: bool):
@@ -56,7 +59,7 @@ def main(tokenizer_param: str, new_json: bool):
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
     train_data = pd.read_csv(
-        os.path.join(ROOT_DIR, "data", "processed", f"train_augmented.csv")
+        os.path.join(ROOT_DIR, "data", "processed", f"{tokenizer_param}_train.csv")
     )
     val_data = pd.read_csv(
         os.path.join(ROOT_DIR, "data", "processed", f"validation.csv")
@@ -66,6 +69,9 @@ def main(tokenizer_param: str, new_json: bool):
     # load the tokenizer
     TOKENIZER_REGISTRY = {
         "BPE": BPETokenizer,
+        "Word": WordTokenizer,
+        "Char": CharTokenizer,
+        "Unigram": UnigramTokenizer,
     }
     tokenizer = TOKENIZER_REGISTRY[tokenizer_param]()
     tokenizer.load(
@@ -137,7 +143,7 @@ if __name__ == "__main__":
         "--tokenizer",
         type=str,
         default="BPE",
-        choices=["BPE", "Word", "Canine"],
+        choices=["BPE", "Word", "Char", "Unigram"],
         help="Tokenizer regime to use",
     )
     parser.add_argument(

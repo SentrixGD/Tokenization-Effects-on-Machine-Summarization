@@ -12,6 +12,55 @@ import torch.nn.functional as F
 from torch.amp import autocast
 
 # ----------------------------
+# GBST
+# ----------------------------
+
+
+class GBST(nn.Module):
+    def __init__(self, embed_dim: int, max_block_size: int):
+        super().__init__()
+        self.max_k = max_block_size
+        self.scorers = nn.ModuleList(
+            [nn.Linear(embed_dim, 1, bias=False) for _ in range(self.max_k)]
+        )
+
+    def forward(self, x: torch.Tensor):
+        B, T, D = x.shape
+        blocks = []
+        scores = []
+        for k in range(self.max_k):
+            pooled = F.avg_pool1d(
+                x.transpose(1, 2), kernel_size=k, stride=1, padding=0
+            ).transpose(1, 2)
+            pad = T - pooled.shape[1]
+            pooled = F.pad(pooled, (0, 0, 0, pad))
+            blocks.append(pooled)
+            scores.append(self.scorers[k - 1](pooled))
+        blocks = torch.stack(blocks, dim=-1)
+        scores = torch.stack(scores, dim=-1)
+        weights = torch.softmax(scores, dim=-1)
+        out = (blocks * weights).sum(dim=-1)
+        return out
+
+
+# ----------------------------
+# Rotary Positional Embeddings
+# ----------------------------
+
+
+def downsampling(x, r):
+    B, T, D = x.shape
+    pad_len = (r - (T % r)) % r
+    if pad_len > 0:
+        pad = torch.zeros(B, pad_len, D, device=x.device, dtype=x.dtype)
+        x = torch.cat([x, pad], dim=1)
+        T = T + pad_len
+    x_blocks = x.view(B, T // r, r, D)
+    x_ds = x_blocks[:, :, 0, :].contiguous()
+    return x_ds
+
+
+# ----------------------------
 # Rotary Positional Embeddings
 # ----------------------------
 
@@ -435,6 +484,8 @@ class Model(nn.Module):
         dropout_out: float,
         pad_idx: int,
         max_seq_len: int,
+        gbst: bool = False,
+        max_gbst_len: int = 1,
     ):
         """
         Initializes a Model module.
@@ -470,6 +521,9 @@ class Model(nn.Module):
 
         # Token embeddings
         self.token_embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
+        self.use_gbst = gbst
+        self.max_gbst_len = max_gbst_len
+        self.gbst = GBST(embed_dim, max_gbst_len) if gbst else None
 
         # Encoder stack
         self.encoder_layers = nn.ModuleList(
@@ -518,6 +572,10 @@ class Model(nn.Module):
             torch.Tensor: Encoder output tensor preserving the input shape.
         """
         x = self.token_embedding(src) * math.sqrt(self.embed_dim)
+
+        if self.use_gbst:
+            x = self.gbst(x)
+            x = downsampling(x, self.max_gbst_len)
 
         for layer in self.encoder_layers:
             x = layer(x, angles, attn_mask)
@@ -579,15 +637,16 @@ class Model(nn.Module):
         sin_tgt = self.rope_sin[:seq_len_tgt].to("cuda")
 
         # Get padding masks
-        src_pad_mask = src != 0
+        enc_src_pad_mask = src[:: self.max_gbst_len] != 0
+        dec_src_pad_mask = src != 0
         tgt_pad_mask = tgt != 0
         # Run forward pass
-        encoder_output = self.encode(src, (sin_src, cos_src), src_pad_mask)
+        encoder_output = self.encode(src, (sin_src, cos_src), enc_src_pad_mask)
         decoder_output = self.decode(
             encoder_output,
             tgt,
             (sin_tgt, cos_tgt),
-            src_pad_mask,
+            dec_src_pad_mask,
             tgt_pad_mask,
         )
 
