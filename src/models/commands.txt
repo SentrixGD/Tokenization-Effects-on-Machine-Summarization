@@ -1,0 +1,7 @@
+python -m src.models.evaluation --tokenizer Word --seq_len 1013
+python -m src.models.evaluation --tokenizer BPE --seq_len 1182
+python -m src.models.evaluation --tokenizer Char --vocab_size 98 --seq_len 5665
+python -m src.models.evaluation --tokenizer Charformer --vocab_size 98 --seq_len 5638 --gbst --gbst_len 4
+
+
+python -m src.models.evaluation --tokenizer Unigram --seq_len 

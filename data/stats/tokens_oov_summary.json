@@ -1,0 +1,22 @@
+{
+    "/home/semyon/PycharmProjects/Tokenization-Effects-on-Machine-Summarization/data/tokenized/tokenized_train_BPE.csv": {
+        "tokens_count": 327535918,
+        "oov_count": 38,
+        "oov_ratio": 1.1601781029706794e-07
+    },
+    "/home/semyon/PycharmProjects/Tokenization-Effects-on-Machine-Summarization/data/tokenized/tokenized_train_Word.csv": {
+        "tokens_count": 269724188,
+        "oov_count": 23923987,
+        "oov_ratio": 0.08869796653164824
+    },
+    "/home/semyon/PycharmProjects/Tokenization-Effects-on-Machine-Summarization/data/tokenized/tokenized_train_Char.csv": {
+        "tokens_count": 1533805171,
+        "oov_count": 38,
+        "oov_ratio": 2.477498493190306e-08
+    },
+    "/home/semyon/PycharmProjects/Tokenization-Effects-on-Machine-Summarization/data/tokenized/tokenized_train_Unigram.csv": {
+        "tokens_count": 360357112,
+        "oov_count": 660511,
+        "oov_ratio": 0.0018329345474385975
+    }
+}

@@ -255,6 +255,8 @@ def main(
     layers: int,
     lr: float,
     true_batch_size: int,
+    gbst: bool,
+    max_gbst_len: int,
 ):
     """
     Main function for training the Text Summarization model.
@@ -293,9 +295,13 @@ def main(
     )
 
     # load tokenized train, validation, and test datasets
+    if tokenizer_name == "Charformer":
+        tokenizer_name_file = "Char"
+    else:
+        tokenizer_name_file = tokenizer_name
     train_data = pd.read_csv(
         os.path.join(
-            ROOT_DIR, "data", "tokenized", f"tokenized_train_{tokenizer_name}.csv"
+            ROOT_DIR, "data", "tokenized", f"tokenized_train_{tokenizer_name_file}.csv"
         )
     )
 
@@ -306,7 +312,7 @@ def main(
                 ROOT_DIR,
                 "data",
                 "stats",
-                f"{tokenizer_name}_stats.json",
+                f"{tokenizer_name_file}_stats.json",
             )
         )
     )
@@ -318,7 +324,10 @@ def main(
 
     # load the SentencePiece tokenizer model
     model_path = os.path.join(
-        ROOT_DIR, "tokenizer", f"{tokenizer_name}", f"{tokenizer_name}_tokenizer.model"
+        ROOT_DIR,
+        "tokenizer",
+        f"{tokenizer_name_file}",
+        f"{tokenizer_name_file}_tokenizer.model",
     )
     CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -340,7 +349,18 @@ def main(
     accumulation = true_batch_size // batch_size
 
     model = (
-        Model(vocab_size, embed_dim, layers, heads, 0.1, 0.1, 0, input_len)
+        Model(
+            vocab_size,
+            embed_dim,
+            layers,
+            heads,
+            0.1,
+            0.1,
+            0,
+            input_len,
+            gbst,
+            max_gbst_len,
+        )
         .float()
         .cuda()
     )
@@ -670,6 +690,17 @@ if __name__ == "__main__":
         default=32,
         help="Batch size (default: 32)",
     )
+    parser.add_argument(
+        "--gbst",
+        action="store_true",
+        help="Use GBST for charformer (default: False)",
+    )
+    parser.add_argument(
+        "--max_gbst_len",
+        type=int,
+        default=1,
+        help="Max length of gbst downsampling if used (default: 1)",
+    )
     args = parser.parse_args()
 
     main(
@@ -681,4 +712,6 @@ if __name__ == "__main__":
         layers=args.layers,
         lr=args.lr,
         true_batch_size=args.batch_size,
+        gbst=args.gbst,
+        max_gbst_len=args.max_gbst_len,
     )

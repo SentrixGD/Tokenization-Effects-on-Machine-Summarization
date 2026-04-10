@@ -28,7 +28,7 @@ class GBST(nn.Module):
         B, T, D = x.shape
         blocks = []
         scores = []
-        for k in range(self.max_k):
+        for k in range(1, self.max_k + 1):
             pooled = F.avg_pool1d(
                 x.transpose(1, 2), kernel_size=k, stride=1, padding=0
             ).transpose(1, 2)
@@ -183,7 +183,6 @@ class MultiFlashAttentionRoPE(nn.Module):
         v = v.permute(0, 2, 1, 3)  # [batch, num_heads, seq_len_kv, head_dim]
         attn_mask = attn_mask[:, None, None, :].bool()
         # shape: [B, 1, 1, S]
-
         attn_out = F.scaled_dot_product_attention(
             q,
             k,
@@ -627,7 +626,7 @@ class Model(nn.Module):
         Returns:
             torch.Tensor: Logits tensor of shape (batch, tgt_len, vocab_size).
         """
-        seq_len_src = src.shape[1]
+        seq_len_src = math.ceil(src.shape[1] / self.max_gbst_len)
         seq_len_tgt = tgt.shape[1]
 
         # Get RoPE angles
@@ -637,16 +636,15 @@ class Model(nn.Module):
         sin_tgt = self.rope_sin[:seq_len_tgt].to("cuda")
 
         # Get padding masks
-        enc_src_pad_mask = src[:: self.max_gbst_len] != 0
-        dec_src_pad_mask = src != 0
+        src_pad_mask = src[:, :: self.max_gbst_len] != 0
         tgt_pad_mask = tgt != 0
         # Run forward pass
-        encoder_output = self.encode(src, (sin_src, cos_src), enc_src_pad_mask)
+        encoder_output = self.encode(src, (sin_src, cos_src), src_pad_mask)
         decoder_output = self.decode(
             encoder_output,
             tgt,
             (sin_tgt, cos_tgt),
-            dec_src_pad_mask,
+            src_pad_mask,
             tgt_pad_mask,
         )
 
